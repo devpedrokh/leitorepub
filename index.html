@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<title>Meu Leitor EPUB</title>
+<style>
+  :root{
+    --bg:#121212;
+    --surface:#1e1e1e;
+    --surface-2:#262626;
+    --primary:#2ecc71;
+    --primary-dark:#27ae60;
+    --text:#f2f2f2;
+    --text-secondary:#a0a0a0;
+    --error:#ff6b6b;
+    --border:#333;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    min-height:100vh;
+  }
+  .tela{ display:none; min-height:100vh; }
+  .tela.ativa{ display:flex; flex-direction:column; }
+  button{ font-family:inherit; cursor:pointer; border:none; }
+
+  .btn-primario{
+    background:var(--primary);
+    color:#0a0a0a;
+    font-weight:600;
+    font-size:16px;
+    padding:14px 24px;
+    border-radius:12px;
+    width:100%;
+    max-width:320px;
+  }
+  .btn-primario:active{ background:var(--primary-dark); }
+  .btn-primario:disabled{ opacity:.6; cursor:default; }
+
+  /* ---------- Tela 1: código ---------- */
+  #tela-codigo{ align-items:center; justify-content:center; padding:24px; text-align:center; }
+  #tela-codigo .conteudo{ width:100%; max-width:320px; display:flex; flex-direction:column; align-items:center; gap:16px; }
+  #tela-codigo h1{ font-size:20px; margin:0; }
+  #tela-codigo p{ color:var(--text-secondary); font-size:14px; margin:0 0 8px; }
+  #input-codigo{
+    width:100%;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-size:20px;
+    letter-spacing:4px;
+    text-align:center;
+    text-transform:uppercase;
+    padding:16px;
+    border-radius:12px;
+  }
+  #input-codigo:focus{ outline:none; border-color:var(--primary); }
+  #erro-codigo{ color:var(--error); font-size:13px; min-height:18px; }
+
+  /* ---------- Tela 2: biblioteca ---------- */
+  #tela-biblioteca{ padding-bottom:96px; }
+  .topo{ display:flex; align-items:center; justify-content:space-between; padding:20px; border-bottom:1px solid var(--border); }
+  .topo h2{ margin:0; font-size:18px; }
+  .link-sair{ color:var(--text-secondary); background:none; font-size:13px; text-decoration:underline; }
+  .card-codigo{
+    margin:16px 16px 0; background:var(--surface); border:1px solid rgba(46,204,113,0.3);
+    border-radius:14px; padding:16px; display:flex; align-items:center; gap:10px;
+    font-size:14px; color:var(--text-secondary);
+  }
+  .card-codigo .icone-sync{ color:var(--primary); font-size:18px; line-height:1; }
+  .codigo-badge{
+    margin-left:auto; background:rgba(46,204,113,0.12); border:1px solid var(--primary);
+    color:var(--primary); font-weight:700; letter-spacing:2px; padding:6px 14px;
+    border-radius:10px; font-size:14px;
+  }
+  .lista-livros{ padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .card-livro{ display:flex; gap:12px; background:var(--surface); border-radius:14px; padding:12px; align-items:center; }
+  .capa-livro{
+    width:56px; height:80px; border-radius:6px; background:var(--surface-2);
+    flex-shrink:0; display:flex; align-items:center; justify-content:center;
+    font-size:9px; color:var(--text-secondary); overflow:hidden; text-align:center;
+  }
+  .capa-livro img{ width:100%; height:100%; object-fit:cover; border-radius:6px; }
+  .info-livro{ display:flex; flex-direction:column; gap:2px; overflow:hidden; flex:1; min-width:0; }
+  .info-livro .titulo{ font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .info-livro .autor{ font-size:13px; color:var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .badge-formato{
+    align-self:flex-start; margin-top:4px; font-size:11px; font-weight:600;
+    color:var(--primary); background:rgba(46,204,113,0.15); padding:2px 8px; border-radius:6px;
+  }
+  .btn-excluir{
+    background:none; color:var(--error); font-size:13px; font-weight:600;
+    padding:6px 4px; flex-shrink:0; align-self:center;
+  }
+  .btn-excluir:active{ opacity:0.7; }
+  .vazio{ text-align:center; color:var(--text-secondary); padding:48px 24px; font-size:14px; }
+  .fab{
+    position:fixed; right:20px; bottom:24px; width:56px; height:56px; border-radius:50%;
+    background:var(--primary); color:#0a0a0a; font-size:28px; line-height:1; padding:0; padding-bottom:3px;
+    display:flex; align-items:center; justify-content:center; box-shadow:0 4px 12px rgba(0,0,0,0.4);
+  }
+  #erro-toast{
+    position:fixed; left:16px; right:16px; bottom:96px; background:var(--error); color:#1a0000;
+    padding:12px 16px; border-radius:10px; font-size:13px; display:none; text-align:center;
+  }
+
+  /* ---------- Tela 3: importando ---------- */
+  #tela-importando{ align-items:center; justify-content:center; padding:24px; text-align:center; }
+  .spinner{
+    width:40px; height:40px; border:3px solid var(--surface-2); border-top:3px solid var(--primary);
+    border-radius:50%; animation:girar 0.8s linear infinite; margin:0 auto 20px;
+  }
+  @keyframes girar{ to{ transform:rotate(360deg); } }
+  .card-resultado{ background:var(--surface); border-radius:16px; padding:20px; width:100%; max-width:340px; text-align:left; }
+  .card-resultado h3{ margin:0 0 16px; font-size:16px; color:var(--primary); }
+  .linha-resultado{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:14px; }
+  .linha-resultado:last-child{ border-bottom:none; }
+  .linha-resultado span:first-child{ color:var(--text-secondary); }
+</style>
+</head>
+<body>
+
+  <!-- TELA 1: CÓDIGO -->
+  <div id="tela-codigo" class="tela ativa">
+    <div class="conteudo">
+      <h1>Vincular relógio</h1>
+      <p>Digite o código exibido no seu Amazfit</p>
+      <input id="input-codigo" type="text" maxlength="10" placeholder="AB12CD" autocomplete="off">
+      <div id="erro-codigo"></div>
+      <button id="btn-entrar" class="btn-primario">Entrar</button>
+    </div>
+  </div>
+
+  <!-- TELA 2: BIBLIOTECA -->
+  <div id="tela-biblioteca" class="tela">
+    <div class="topo">
+      <h2>Minha Biblioteca</h2>
+      <button id="btn-sair" class="link-sair">Trocar código</button>
+    </div>
+    <div class="card-codigo">
+      <span class="icone-sync">⇄</span>
+      <span>Sincronizado com o código:</span>
+      <span id="codigo-atual-badge" class="codigo-badge"></span>
+    </div>
+    <div id="lista-livros" class="lista-livros"></div>
+    <button id="fab-adicionar" class="fab" title="Adicionar livro">+</button>
+    <input type="file" id="input-arquivo" accept=".epub" style="display:none">
+    <div id="erro-toast"></div>
+  </div>
+
+  <!-- TELA 3: IMPORTANDO -->
+  <div id="tela-importando" class="tela">
+    <div id="bloco-carregando">
+      <div class="spinner"></div>
+      <p>Importando livro…</p>
+    </div>
+    <div id="bloco-resultado" style="display:none; width:100%; flex-direction:column; align-items:center;">
+      <div class="card-resultado">
+        <h3>Processamento concluído</h3>
+        <div class="linha-resultado"><span>Páginas geradas</span><span id="res-paginas">-</span></div>
+        <div class="linha-resultado"><span>Tamanho do arquivo</span><span id="res-tamanho-arquivo">-</span></div>
+        <div class="linha-resultado"><span>Tamanho estimado no relógio</span><span id="res-tamanho-relogio">-</span></div>
+      </div>
+      <button id="btn-voltar-biblioteca" class="btn-primario" style="margin-top:24px;">Voltar para Minha Biblioteca</button>
+    </div>
+  </div>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+  const CHAVE_LOCALSTORAGE = 'epub_reader_codigo';
+  let codigoAtual = null;
+
+  const telaCodigo = document.getElementById('tela-codigo');
+  const telaBiblioteca = document.getElementById('tela-biblioteca');
+  const telaImportando = document.getElementById('tela-importando');
+
+  function mostrarTela(tela){
+    [telaCodigo, telaBiblioteca, telaImportando].forEach(t => t.classList.remove('ativa'));
+    tela.classList.add('ativa');
+  }
+
+  // ---------- Inicialização ----------
+  window.addEventListener('DOMContentLoaded', () => {
+    const salvo = localStorage.getItem(CHAVE_LOCALSTORAGE);
+    if (salvo) {
+      codigoAtual = salvo;
+      mostrarTela(telaBiblioteca);
+      carregarBiblioteca();
+    }
+  });
+
+  // ---------- Tela 1: código ----------
+  const inputCodigo = document.getElementById('input-codigo');
+  const erroCodigo = document.getElementById('erro-codigo');
+  const btnEntrar = document.getElementById('btn-entrar');
+
+  inputCodigo.addEventListener('input', () => { inputCodigo.value = inputCodigo.value.toUpperCase(); });
+  btnEntrar.addEventListener('click', entrarComCodigo);
+  inputCodigo.addEventListener('keydown', e => { if (e.key === 'Enter') entrarComCodigo(); });
+
+  function entrarComCodigo(){
+    const codigo = inputCodigo.value.trim();
+    erroCodigo.textContent = '';
+    btnEntrar.disabled = true;
+    btnEntrar.textContent = 'Entrando…';
+
+    const c = (codigo || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,10}$/.test(c)) {
+      btnEntrar.disabled = false;
+      btnEntrar.textContent = 'Entrar';
+      erroCodigo.textContent = 'Código inválido. Digite o código de 4 a 10 caracteres exibido no relógio.';
+    } else {
+      btnEntrar.disabled = false;
+      btnEntrar.textContent = 'Entrar';
+      codigoAtual = codigo;
+      localStorage.setItem(CHAVE_LOCALSTORAGE, codigoAtual);
+      mostrarTela(telaBiblioteca);
+      carregarBiblioteca();
+    }
+  }
+
+  // ---------- Tela 2: biblioteca ----------
+  const listaLivros = document.getElementById('lista-livros');
+  const btnSair = document.getElementById('btn-sair');
+  const fabAdicionar = document.getElementById('fab-adicionar');
+  const inputArquivo = document.getElementById('input-arquivo');
+  const erroToast = document.getElementById('erro-toast');
+
+  btnSair.addEventListener('click', () => {
+    localStorage.removeItem(CHAVE_LOCALSTORAGE);
+    codigoAtual = null;
+    inputCodigo.value = '';
+    mostrarTela(telaCodigo);
+  });
+
+  fabAdicionar.addEventListener('click', () => inputArquivo.click());
+
+  inputArquivo.addEventListener('change', () => {
+    const arquivo = inputArquivo.files[0];
+    inputArquivo.value = '';
+    if (!arquivo) return;
+
+    if (!arquivo.name.toLowerCase().endsWith('.epub')) {
+      mostrarErroToast('Selecione um arquivo .epub válido.');
+      return;
+    }
+
+    iniciarImportacao(arquivo)
+  });
+
+  function mostrarErroToast(msg){
+    erroToast.textContent = msg;
+    erroToast.style.display = 'block';
+    setTimeout(() => { erroToast.style.display = 'none'; }, 4000);
+  }
+
+  function carregarBiblioteca(){
+    const badgeCodigo = document.getElementById('codigo-atual-badge');
+    if (badgeCodigo) badgeCodigo.textContent = codigoAtual || '';
+    listaLivros.innerHTML = '<div class="vazio">Carregando…</div>';
+    buscarLivrosPorCodigo(codigoAtual)
+      .then(renderizarBiblioteca)
+      .catch((erro) => {
+        listaLivros.innerHTML = '';
+        mostrarErroToast(erro.message || 'Erro ao carregar a biblioteca.');
+      })
+  }
+
+  async function buscarLivrosPorCodigo(codigoBuscado) {
+    // Endpoint do Firestore runQuery usando seu ID de projeto
+    const url = 'https://firestore.googleapis.com/v1/projects/leitorepub-39ab4/databases/(default)/documents:runQuery';
+
+    // Estrutura de consulta para filtrar documentos
+    const query = {
+    structuredQuery: {
+      from: [{ collectionId: 'livros' }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'codigo' },
+            op: 'EQUAL',
+            value: { stringValue: codigoBuscado } // Altere para 'integerValue' se o código for numérico
+          }
+        }
+      }
+    };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(query)
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Filtra e formata os resultados válidos retornados pela API
+      const livros = data
+      .filter(item => item.document) 
+      .map(item => ({
+          id: item.document.name.split('/').pop(),
+          ...item.document.fields
+      }));
+
+      console.log('Livros encontrados:', livros);
+      return livros;
+    } catch (error) {
+      console.error('Falha ao buscar livros:', error);
+    }
+  }
+
+  async function carregarCapa(capaId, elementoCapa) {
+    // Endpoint REST do Firestore para buscar um documento específico pelo ID
+    const url = `https://firestore.googleapis.com/v1/projects/leitorepub-39ab4/databases/(default)/documents/arquivosCapas/${capaId}`;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Capa não encontrada');
+      }
+      const data = await response.json();
+
+      // Ajuste 'url' ou 'base64' conforme o nome do campo salvo no seu Firestore
+      const imagemBase64 = data.fields.capaBase64?.stringValue;
+
+      if (imagemBase64) {
+        elementoCapa.innerHTML = ''; // Remove o texto de "Carregando..."
+        const img = document.createElement('img');
+        img.src = imagemBase64;
+        img.alt = 'Capa do livro';
+        elementoCapa.appendChild(img);
+      } else {
+        elementoCapa.textContent = 'SEM IMAGEM';
+      }
+    } catch (error) {
+      console.error(`Erro ao carregar capa ${capaId}:`, error);
+      elementoCapa.textContent = 'ERRO';
+    }
+  }
+  
+  function renderizarBiblioteca(livros){
+    if (!livros || livros.length === 0) {
+      listaLivros.innerHTML = '<div class="vazio">Nenhum livro ainda.<br>Toque em "+" para importar um EPUB.</div>';
+      return;
+    }
+    listaLivros.innerHTML = '';
+    livros.forEach(livro => {
+      const card = document.createElement('div');
+      card.className = 'card-livro';
+
+      const capa = document.createElement('div');
+      capa.className = 'capa-livro';
+      const capaId = livro.arquivoCapaId ? livro.arquivoCapaId.stringValue : null;
+
+      if (capaId) {
+        capa.textContent = 'Carregando...';
+        carregarCapa(capaId, capa); // Chama a função assíncrona em segundo plano
+      } else {
+        capa.textContent = 'SEM CAPA';
+      }
+
+      const info = document.createElement('div');
+      info.className = 'info-livro';
+      info.innerHTML =
+        '<div class="titulo">' + escaparHtml(livro.titulo.stringValue) + '</div>' +
+        '<div class="autor">' + escaparHtml(livro.autor.stringValue) + '</div>' +
+        '<div class="badge-formato">' + escaparHtml(livro.formato.stringValue) + '</div>';
+
+      const btnExcluir = document.createElement('button');
+      btnExcluir.className = 'btn-excluir';
+      btnExcluir.textContent = 'Excluir';
+      btnExcluir.addEventListener('click', () => excluirLivro(livro, card));
+
+      card.appendChild(capa);
+      card.appendChild(info);
+      card.appendChild(btnExcluir);
+      listaLivros.appendChild(card);
+    });
+  }
+
+  async function excluirDocumentoREST(colecao, docId) {
+    const url = `https://firestore.googleapis.com/v1/projects/leitorepub-39ab4/databases/(default)/documents/${colecao}/${docId}`;
+    const resposta = await fetch(url, { method: 'DELETE' });
+    if (!resposta.ok) {
+      throw new Error(`Erro ao excluir de ${colecao}: ${resposta.statusText}`);
+    }
+  }
+
+  async function excluirLivro(livro, card){
+    const titulo = livro.titulo && livro.titulo.stringValue ? livro.titulo.stringValue : 'este livro';
+    const confirmar = confirm(`Excluir "${titulo}"? Essa ação não pode ser desfeita.`);
+    if (!confirmar) return;
+
+    try {
+      await excluirDocumentoREST('livros', livro.id);
+
+      const capaId = livro.arquivoCapaId ? livro.arquivoCapaId.stringValue : null;
+      if (capaId) {
+        excluirDocumentoREST('arquivosCapas', capaId).catch(() => {});
+      }
+
+      card.remove();
+      if (!listaLivros.children.length) {
+        listaLivros.innerHTML = '<div class="vazio">Nenhum livro ainda.<br>Toque em "+" para importar um EPUB.</div>';
+      }
+    } catch (erro) {
+      mostrarErroToast(erro.message || 'Erro ao excluir o livro.');
+    }
+  }
+
+  function escaparHtml(texto){
+    const div = document.createElement('div');
+    div.textContent = texto == null ? '' : String(texto);
+    return div.innerHTML;
+  }
+
+  // ---------- Tela 3: importando ----------
+  const blocoCarregando = document.getElementById('bloco-carregando');
+  const blocoResultado = document.getElementById('bloco-resultado');
+  const btnVoltarBiblioteca = document.getElementById('btn-voltar-biblioteca');
+
+  btnVoltarBiblioteca.addEventListener('click', () => {
+    mostrarTela(telaBiblioteca);
+    carregarBiblioteca();
+  });
+
+  function iniciarImportacao(arquivo){
+    blocoCarregando.style.display = 'block';
+    blocoResultado.style.display = 'none';
+    mostrarTela(telaImportando);
+
+    uploadNovoLivro(arquivo)
+      .then((resultado) => {
+        document.getElementById('res-paginas').textContent = resultado.paginas.length;
+        document.getElementById('res-tamanho-arquivo').textContent = formatarBytes(resultado.tamanhoArquivoBytes);
+        document.getElementById('res-tamanho-relogio').textContent = formatarBytes(resultado.tamanhoEstimadoRelogioBytes);
+        blocoCarregando.style.display = 'none';
+        blocoResultado.style.display = 'flex';
+      })
+      .catch((erro) => {
+        mostrarTela(telaBiblioteca);
+        mostrarErroToast(erro.message || 'Erro ao processar o EPUB.');
+      })
+  }
+
+  // Função genérica para criar documentos via HTTP POST
+  async function criarDocumentoREST(colecao, campos) {
+    const url = `https://firestore.googleapis.com/v1/projects/leitorepub-39ab4/databases/(default)/documents/${colecao}`;
+    
+    const resposta = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: campos })
+    });
+
+    if (!resposta.ok) {
+      throw new Error(`Erro ao salvar na coleção ${colecao}: ${resposta.statusText}`);
+    }
+
+    const dados = await resposta.json();
+    // Retorna apenas o ID gerado automaticamente pelo Firestore
+    return dados.name.split('/').pop();
+  }
+
+  // Função principal responsável pelo Upload do Livro (Atualizada)
+  async function uploadNovoLivro(livro) {
+    console.log("Iniciando extração do EPUB...");
+    const resultado = await extrairEpub(livro);
+
+    console.log("Salvando a capa do livro...");
+    const capaCampos = {
+      capaBase64: { stringValue: resultado.capaBase64 }
+    };
+    const capaDocId = await criarDocumentoREST('arquivosCapas', capaCampos);
+
+    console.log("Criando o documento do livro com as referências...");
+    // REMOVIDO: O campo 'paginas' foi removido daqui para economizar espaço
+    const livroCampos = {
+      codigo: { stringValue: codigoAtual },
+      titulo: { stringValue: resultado.titulo },
+      autor: { stringValue: resultado.autor },
+      formato: { stringValue: 'EPUB' },
+      dataImportacao: { timestampValue: new Date().toISOString() }, // ISO String para compatibilidade REST
+      arquivoCapaId: { stringValue: capaDocId }
+    };
+    const livroId = await criarDocumentoREST('livros', livroCampos);
+
+    console.log("Salvando as páginas na subcoleção...");
+    // Salva cada página sequencialmente como um documento na subcoleção do livro
+    await criarPaginasEmLoteREST(livroId, resultado.paginas);
+
+    console.log(`Sucesso! Livro cadastrado com ID: ${livroId}`);
+    resultado.id = livroId;
+    return resultado;
+  }
+
+  // função para salvar as páginas em uma única chamada REST
+  async function criarPaginasEmLoteREST(livroId, paginas) {
+    const projectId = 'leitorepub-39ab4'; // Seu Project ID atual
+    const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:commit`;
+
+    // Mapeia cada página para o formato de escrita (Write) da API REST do Firestore
+    const writes = paginas.map((texto, index) => {
+      const numeroPagina = index + 1;
+      const documentPath = `projects/${projectId}/databases/(default)/documents/livros/${livroId}/paginas/pagina_${numeroPagina}`;
+
+      return {
+        update: {
+          name: documentPath,
+          fields: {
+            numero: { integerValue: String(numeroPagina) },
+            texto: { stringValue: texto }
+          }
+        }
+      };
+    });
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Caso precise passar autorização (Token JWT), configure o cabeçalho abaixo:
+        // 'Authorization': `Bearer ${seuTokenDeAcesso}`
+      },
+      body: JSON.stringify({ writes })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Erro ao salvar páginas em lote: ${JSON.stringify(errorData)}`);
+    }
+
+    return await response.json();
+  }
+
+  async function extrairEpub(arquivo) {
+    // Certifique-se de carregar o JSZip (ex: via CDN público) no seu HTML antes de rodar
+    const zip = await JSZip.loadAsync(arquivo);
+    const parser = new DOMParser();
+
+    // 1. Procurar e abrir o container.xml
+    const containerKey = Object.keys(zip.files).find(n => n.toLowerCase() === 'meta-inf/container.xml');
+    if (!containerKey) throw new Error('Arquivo inválido: container.xml não encontrado.');
+
+    const containerXmlText = await zip.files[containerKey].async('string');
+    const containerDoc = parser.parseFromString(containerXmlText, 'application/xml');
+    const rootfileEl = containerDoc.querySelector('rootfile');
+    if (!rootfileEl) throw new Error('Rootfile não encontrado.');
+    const rootfilePath = rootfileEl.getAttribute('full-path');
+
+    // 2. Abrir o arquivo OPF principal
+    const opfDir = rootfilePath.includes('/') ? rootfilePath.substring(0, rootfilePath.lastIndexOf('/') + 1) : '';
+    const opfFile = zip.files[rootfilePath];
+    if (!opfFile) throw new Error('Arquivo OPF não encontrado.');
+
+    const opfXmlText = await opfFile.async('string');
+    const opfDoc = parser.parseFromString(opfXmlText, 'application/xml');
+
+    // 3. Extrair metadados (Título e Autor)
+    const titleEl = opfDoc.querySelector('title') || opfDoc.getElementsByTagName('dc:title')[0] || opfDoc.getElementsByTagName('title')[0];
+    const creatorEl = opfDoc.querySelector('creator') || opfDoc.getElementsByTagName('dc:creator')[0] || opfDoc.getElementsByTagName('creator')[0];
+    const titulo = titleEl ? titleEl.textContent.trim() : arquivo.name.replace(/\.epub$/i, '');
+    const autor = creatorEl ? creatorEl.textContent.trim() : 'Autor desconhecido';
+
+    // 4. Mapear Manifest e Spine (ordem de leitura)
+    const manifestItems = opfDoc.querySelectorAll('manifest > item');
+    const manifest = {};
+    manifestItems.forEach(item => {
+      manifest[item.getAttribute('id')] = {
+        href: item.getAttribute('href'),
+        mediaType: item.getAttribute('media-type'),
+        properties: item.getAttribute('properties') || ''
+      };
+    });
+
+    const spineItems = opfDoc.querySelectorAll('spine > itemref');
+    const ordem = Array.from(spineItems)
+      .map(ref => manifest[ref.getAttribute('idref')])
+      .filter(Boolean);
+
+    // 5. Extrair o texto de cada capítulo na ordem correta
+    const paragrafosLivro = [];
+    for (const item of ordem) {
+      const caminho = opfDir + item.href;
+      const arquivoCap = zip.files[caminho] || zip.files[decodeURIComponent(caminho)];
+      if (!arquivoCap) continue;
+
+      const htmlText = await arquivoCap.async('string');
+      const capDoc = parser.parseFromString(htmlText, 'text/html');
+      
+      // Captura parágrafos e cabeçalhos para manter a estrutura textual básica
+      const tagsTexto = capDoc.querySelectorAll('p, div, h1, h2, h3');
+      tagsTexto.forEach(tag => {
+        const txt = tag.textContent.trim();
+        if (txt) paragrafosLivro.push(txt);
+      });
+    }
+
+    // 6. Agrupar parágrafos em "páginas" de aproximadamente 300 caracteres
+    const TAMANHO_PAGINA = 300;
+    const paginas = [];
+    let buffer = '';
+    paragrafosLivro.forEach(p => {
+      if ((buffer + p).length > TAMANHO_PAGINA && buffer.length > 0) {
+        paginas.push(buffer.trim());
+        buffer = '';
+      }
+      buffer += p + '\n\n';
+    });
+    if (buffer.trim().length > 0) paginas.push(buffer.trim());
+
+    // 7. Extrair capa em Base64
+    let capaBase64 = '';
+    let capaHref = '';
+
+    // Busca padrão EPUB3 (via properties) ou EPUB2 (via meta cover)
+    const itemCapaEpub3 = Object.values(manifest).find(item => item.properties.includes('cover-image'));
+    if (itemCapaEpub3) {
+      capaHref = itemCapaEpub3.href;
+    } else {
+      const metaCover = opfDoc.querySelector('meta[name="cover"]');
+      if (metaCover) {
+        const idCapa = metaCover.getAttribute('content');
+        if (manifest[idCapa]) capaHref = manifest[idCapa].href;
+      }
+    }
+
+    if (capaHref) {
+      const caminhoCapa = opfDir + capaHref;
+      const arquivoCapa = zip.files[caminhoCapa] || zip.files[decodeURIComponent(caminhoCapa)];
+      if (arquivoCapa) {
+        const mime = arquivoCapa.name.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        const base64Bytes = await arquivoCapa.async('base64');
+        capaBase64 = `data:${mime};base64,${base64Bytes}`;
+      }
+    }
+
+    return {
+      titulo,
+      autor,
+      paginas,
+      capaBase64
+    };
+  }
+
+  function formatarBytes(bytes){
+    if (bytes == null) return '-';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/(1024*1024)).toFixed(1) + ' MB';
+  }
+
+  
+</script>
+</body>
+</html>
