@@ -4,6 +4,7 @@
 <base target="_top">
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="favicon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Meu Leitor EPUB</title>
 <style>
   :root{
@@ -602,6 +603,9 @@
       // Captura parágrafos e cabeçalhos para manter a estrutura textual básica
       const tagsTexto = capDoc.querySelectorAll('p, div, h1, h2, h3');
       tagsTexto.forEach(tag => {
+        // Resolve o BUG de textos duplicados
+        if (tag.querySelector('p, div, h1, h2, h3')) return;
+        
         const txt = tag.textContent.trim();
         if (txt) paragrafosLivro.push(txt);
       });
